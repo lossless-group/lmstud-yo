@@ -1,12 +1,72 @@
-/* LMStudioModal Styles */
+/* LMStudio Query Modal Styles */
 
-.lmstudio-modal .text-input {
-    width: 100%;
-    margin: 8px 0;
-    padding: 12px;
+.lmstudio-query-modal .modal-content {
+    padding: 1.5rem;
+    max-width: 800px;
 }
 
-.lmstudio-modal .system-prompt-input {
+.lmstudio-query-container {
+    margin-bottom: 1.5rem;
+}
+
+.lmstudio-query-input {
     width: 100%;
-    min-height: 60px;
-} 
+    min-height: 120px;
+    margin: 0.5rem 0 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    font-family: var(--font-monospace);
+    font-size: 0.9em;
+    resize: vertical;
+}
+
+.lmstudio-response-container {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.lmstudio-response {
+    margin-top: 0.5rem;
+    padding: 1rem;
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    white-space: pre-wrap;
+    min-height: 100px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.lmstudio-submit-button {
+    display: block;
+    width: 100%;
+    padding: 0.6rem 1rem;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.lmstudio-submit-button:hover:not(:disabled) {
+    background-color: var(--interactive-accent-hover);
+}
+
+.lmstudio-submit-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Model selection styling */
+.lmstudio-query-container .setting-item {
+    padding: 0;
+    border: none;
+}
+
+.lmstudio-query-container .setting-item-control select {
+    width: 100%;
+}
