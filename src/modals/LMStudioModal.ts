@@ -84,8 +84,9 @@ export class LMStudioModal extends Modal {
 
         // Stream toggle
         const streamDiv = form.createDiv({cls: 'setting-item'});
-        const streamLabel = streamDiv.createDiv({cls: 'checkbox-container'});
+        const streamLabel = streamDiv.createEl('label');
         this.streamToggle = streamLabel.createEl('input', {type: 'checkbox'});
+        this.streamToggle.checked = true;
         streamLabel.createSpan({text: ' Stream response'});
         
         const buttonDiv = contentEl.createDiv({cls: 'setting-item'});
@@ -113,6 +114,15 @@ export class LMStudioModal extends Modal {
         }
 
         const processedQuery = query;
+        const cursor = this.editor.getCursor();
+        const responseCursor = { line: cursor.line, ch: cursor.ch };
+
+        // Insert a new line if we're not at the start of a line
+        if (cursor.ch > 0) {
+            this.editor.replaceRange('\n\n', cursor);
+            responseCursor.line += 2;
+            responseCursor.ch = 0;
+        }
 
         const options: LMStudioOptions = {
             max_tokens: parseInt(this.maxTokensInput.value) || 2048,
@@ -128,11 +138,36 @@ export class LMStudioModal extends Modal {
         }
 
         this.close();
-        await this.lmStudioService.queryLMStudio(processedQuery, {
-            ...options,
-            model: this.modelSelect.value,
-            editor: this.editor
-        });
+        
+        try {
+            if (this.streamToggle.checked) {
+                // Use streaming
+                await this.lmStudioService.queryLMStudio(processedQuery, options);
+            } else {
+                // Use non-streaming
+                const response = await fetch(`${this.lmStudioService.settings.lmStudioEndpoint}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: options.model || 'ibm/granite-3.2-8b',
+                        messages: [
+                            ...(options.system_prompt ? [{ role: 'system', content: options.system_prompt }] : []),
+                            { role: 'user', content: processedQuery }
+                        ],
+                        max_tokens: options.max_tokens,
+                        temperature: options.temperature,
+                        stream: false
+                    })
+                });
+                
+                await this.lmStudioService.handleNonStreamingResponse(response, this.editor, responseCursor);
+            }
+        } catch (error) {
+            console.error('Error in LM Studio request:', error);
+            const errorMsg = error instanceof Error ? error.message : 'An error occurred';
+            this.editor.replaceRange(`\n\nError: ${errorMsg}`, responseCursor);
+            new Notice(`LM Studio Error: ${errorMsg}`);
+        }
     }
     
     onClose() {
