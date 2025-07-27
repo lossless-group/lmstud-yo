@@ -1,0 +1,11 @@
+{
+	"id": "lmstud-yo",
+	"name": "LMStud Yo",
+	"version": "0.0.1",
+	"minAppVersion": "1.8.10",
+	"description": "A plugin for Obsidian that allows you to generate content using locally stored models with the LLM Studio API.",
+	"author": "The Lossless Group",
+	"authorUrl": "https://lossless.group",
+	"fundingUrl": "https://coff.ee/losslessgroup",
+	"isDesktopOnly": true
+}
