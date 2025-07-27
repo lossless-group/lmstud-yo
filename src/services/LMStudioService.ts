@@ -1,41 +1,85 @@
-import { Notice } from 'obsidian';
+import { Notice, Editor } from 'obsidian';
+import type { PromptsService } from './promptsService';
 import { LMStudioSettings } from '../settings/LMStudioSettings';
 
 export interface ChatMessage {
-    role: 'system' | 'user' | 'assistant';
+    role: 'user' | 'assistant' | 'system';
     content: string;
 }
 
-export interface LMStudioResponse {
-    id: string;
-    object: string;
-    created: number;
-    model: string;
+interface LMStudioResponse {
     choices: Array<{
-        index: number;
-        message: ChatMessage;
-        finish_reason: string | null;
+        message: {
+            content: string;
+        };
     }>;
-    usage?: {
-        prompt_tokens: number;
-        completion_tokens: number;
-        total_tokens: number;
-    };
 }
 
 export interface LMStudioOptions {
     max_tokens?: number;
     temperature?: number;
     top_p?: number;
-    system_prompt?: string;
-    return_images?: boolean;
+    system_prompt?: string | undefined;
+    model?: string;
+    stream?: boolean;
+    editor?: Editor; 
 }
 
-export class LMStudioService {
-    private settings: LMStudioSettings;
 
-    constructor(settings: LMStudioSettings) {
-        this.settings = settings;
+
+export class LMStudioService {
+    constructor(
+        private settings: LMStudioSettings,
+        public promptsService: PromptsService
+    ) {}
+    
+    // Removed getPromptsService as we made promptsService public
+
+
+
+    public async queryLMStudio(
+        prompt: string, 
+        options: LMStudioOptions = {}
+    ): Promise<string> {
+        try {
+            const endpoint = this.settings.lmStudioEndpoint.endsWith('/') 
+                ? `${this.settings.lmStudioEndpoint}chat/completions`
+                : `${this.settings.lmStudioEndpoint}/chat/completions`;
+
+            const requestBody: any = {
+                model: 'local-model', // This will be overridden by LM Studio
+                messages: [
+                    ...(options.system_prompt 
+                        ? [{ role: 'system', content: options.system_prompt }] 
+                        : []),
+                    { role: 'user', content: prompt }
+                ],
+                temperature: options.temperature ?? 0.7,
+                max_tokens: options.max_tokens ?? 1000,
+                top_p: options.top_p ?? 1.0,
+                stream: false
+            };
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`LM Studio API error: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || '';
+            
+        } catch (error) {
+            console.error('LM Studio API request failed:', error);
+            throw new Error(`Failed to query LM Studio: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     public async getModels(): Promise<string[]> {

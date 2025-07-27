@@ -12,6 +12,8 @@ export interface LMStudioSettings {
     endpoints: LMStudioEndpointConfig;
     defaultModel: string;
     requestTemplate?: string;
+    lmStudioEndpoint: string;
+    promptsService: any; // This should be imported from promptsService, but we'll use any to avoid circular deps
 }
 
 export const DEFAULT_LMSTUDIO_SETTINGS: LMStudioSettings = {
@@ -23,7 +25,9 @@ export const DEFAULT_LMSTUDIO_SETTINGS: LMStudioSettings = {
         models: '/v1/models'
     },
     defaultModel: 'ibm/granite-3.2-8b',
-    requestTemplate: ''
+    requestTemplate: '',
+    lmStudioEndpoint: 'http://localhost:1234',
+    promptsService: null as any // This will be set by the plugin
 };
 
 export class LMStudioSettingTab extends PluginSettingTab {

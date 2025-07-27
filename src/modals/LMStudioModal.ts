@@ -1,145 +1,142 @@
-import { App, Modal, Notice, Setting } from 'obsidian';
-import { LMStudioService } from '../services/LMStudioService';
-import { LMStudioSettings } from '../settings/LMStudioSettings';
-
-interface LMStudioPluginSettings {
-    lmstudio: LMStudioSettings;
-}
+import { App, Modal, Notice, Editor } from 'obsidian';
+import { LMStudioService, LMStudioOptions } from '../services/LMStudioService';
+import { PromptsService } from '../services/promptsService.ts';
 
 export class LMStudioModal extends Modal {
-    private service: LMStudioService;
-    private isProcessing = false;
-    private selectedModel: string = '';
-    private availableModels: string[] = [];
-    // Settings is used in the constructor to initialize the service and selectedModel
-    private settings: LMStudioPluginSettings;
+    private editor: Editor;
+    private lmStudioService: LMStudioService;
+    private promptsService: PromptsService;
+    private queryInput!: HTMLTextAreaElement;
+    private modelSelect!: HTMLSelectElement;
+    private streamToggle!: HTMLInputElement;
+    private maxTokensInput!: HTMLInputElement;
+    private temperatureInput!: HTMLInputElement;
+    private systemPromptInput!: HTMLTextAreaElement;
 
-    constructor(
-        app: App,
-        settings: LMStudioPluginSettings,
-        private onQuery: (query: string, model: string) => Promise<string>
-    ) {
+    constructor(app: App, editor: Editor, lmStudioService: LMStudioService, promptsService: PromptsService) {
         super(app);
-        this.settings = settings;
-        this.service = new LMStudioService(settings.lmstudio);
-        this.selectedModel = settings.lmstudio.defaultModel;
-        this.modalEl.addClass('lmstudio-query-modal');
+        this.editor = editor;
+        this.lmStudioService = lmStudioService;
+        this.promptsService = promptsService;
     }
-
-    async onOpen() {
-        const { contentEl } = this;
-        contentEl.empty();
-
-        // Header
-        contentEl.createEl('h2', { text: 'LM Studio Query' });
-
+    
+    onOpen() {
+        const {contentEl} = this;
+        contentEl.addClass('lmstudio-modal');
+        contentEl.createEl('h2', {text: 'Ask LM Studio'});
+        
+        const form = contentEl.createEl('form');
+        
         // Query input
-        const queryContainer = contentEl.createDiv('lmstudio-query-container');
-        
-        // Response area
-        const responseContainer = contentEl.createDiv('lmstudio-response-container');
-        responseContainer.createEl('h3', { text: 'Response' });
-        const responseEl = responseContainer.createDiv('lmstudio-response');
-        
+        const queryDiv = form.createDiv({cls: 'setting-item'});
+        queryDiv.createEl('label', {text: 'Your Question'});
+        this.queryInput = queryDiv.createEl('textarea', {
+            cls: 'text-input',
+            attr: {
+                rows: '4',
+                placeholder: this.promptsService.getLMStudioQueryPlaceholder()
+            }
+        });
+
         // Model selection
-        new Setting(queryContainer)
-            .setName('Model')
-            .addDropdown(dropdown => {
-                this.availableModels.forEach(model => {
-                    dropdown.addOption(model, model);
-                });
-                dropdown
-                    .setValue(this.selectedModel)
-                    .onChange(value => {
-                        this.selectedModel = value;
-                    });
-            });
+        const modelDiv = form.createDiv({cls: 'setting-item'});
+        modelDiv.createEl('label', {text: 'Model'});
+        this.modelSelect = modelDiv.createEl('select', {cls: 'dropdown'});
+        // Use common LM Studio models - these would be dynamically loaded ideally
+        ['ibm/granite-3.2-8b', 'microsoft/phi-4-reasoning-plus', 'google/gemma-3-12b', 'meta-llama/llama-3.2-3b-instruct', 'custom-model'].forEach(model => {
+            const option = this.modelSelect.createEl('option', {value: model, text: model});
+            if (model === 'ibm/granite-3.2-8b') option.selected = true;
+        });
 
-        // Query input
-        const queryInput = queryContainer.createEl('textarea', {
-            placeholder: 'Enter your query...',
-            cls: 'lmstudio-query-input'
+        // System prompt
+        const systemDiv = form.createDiv({cls: 'setting-item'});
+        systemDiv.createEl('label', {text: 'System Prompt (Optional)'});
+        this.systemPromptInput = systemDiv.createEl('textarea', {
+            cls: 'text-input system-prompt-input',
+            attr: {
+                rows: '2',
+                placeholder: this.promptsService.getLMStudioSystemPromptPlaceholder()
+            }
+        });
+
+        // Max tokens
+        const maxTokensDiv = form.createDiv({cls: 'setting-item'});
+        maxTokensDiv.createEl('label', {text: 'Max Tokens'});
+        this.maxTokensInput = maxTokensDiv.createEl('input', {
+            type: 'number',
+            value: '2048',
+            cls: 'text-input'
+        });
+
+        // Temperature
+        const tempDiv = form.createDiv({cls: 'setting-item'});
+        tempDiv.createEl('label', {text: 'Temperature (0.0 - 2.0)'});
+        this.temperatureInput = tempDiv.createEl('input', {
+            type: 'number',
+            value: '0.7',
+            attr: {
+                step: '0.1',
+                min: '0',
+                max: '2'
+            },
+            cls: 'text-input'
+        });
+
+        // Stream toggle
+        const streamDiv = form.createDiv({cls: 'setting-item'});
+        const streamLabel = streamDiv.createDiv({cls: 'checkbox-container'});
+        this.streamToggle = streamLabel.createEl('input', {type: 'checkbox'});
+        streamLabel.createSpan({text: ' Stream response'});
+        
+        const buttonDiv = contentEl.createDiv({cls: 'setting-item'});
+        const askButton = buttonDiv.createEl('button', {
+            text: 'Ask LM Studio',
+            cls: 'mod-cta'
         });
         
-        // Submit button
-        const submitButton = queryContainer.createEl('button', {
-            text: 'Submit Query',
-            cls: 'lmstudio-submit-button'
-        });
-
-        // Handle query submission
-        const submitQuery = async () => {
-            const query = queryInput.value.trim();
-            if (!query || this.isProcessing) return;
-
-            this.isProcessing = true;
-            submitButton.setAttribute('disabled', 'true');
-            submitButton.textContent = 'Processing...';
-            responseEl.textContent = '';
-            
-            try {
-                // Get response from LM Studio
-                const response = await this.onQuery(query, this.selectedModel);
-                responseEl.textContent = response;
-            } catch (error: unknown) {
-                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                console.error('Query failed:', error);
-                new Notice(`Error: ${errorMessage}`);
-                responseEl.textContent = `Error: ${errorMessage}`;
-            } finally {
-                this.isProcessing = false;
-                submitButton.removeAttribute('disabled');
-                submitButton.textContent = 'Submit Query';
-            }
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            this.onSubmit();
         };
-
-        // Event listeners
-        submitButton.addEventListener('click', submitQuery);
-        queryInput.addEventListener('keydown', (e: KeyboardEvent) => {
-            if (e.key === 'Enter' && e.ctrlKey) {
-                e.preventDefault();
-                submitQuery();
-            }
-        });
-
-        // Load available models
-        this.loadModels().catch(error => {
-            console.error('Failed to load models:', error);
-            new Notice('Failed to load models. Check console for details.');
-        });
+        
+        askButton.onclick = () => this.onSubmit();
+        
+        // Focus on the query input
+        setTimeout(() => this.queryInput.focus(), 100);
     }
-
-    private async loadModels() {
-        try {
-            this.availableModels = await this.service.getModels();
-            if (this.availableModels.length > 0) {
-                // Ensure we always have a valid selected model
-                if (!this.selectedModel || !this.availableModels.includes(this.selectedModel)) {
-                    this.selectedModel = this.availableModels[0] || '';
-                }
-                
-                // Update the dropdown with the available models
-                const dropdown = this.contentEl.querySelector('.lmstudio-model-dropdown');
-                if (dropdown instanceof HTMLSelectElement) {
-                    dropdown.innerHTML = '';
-                    this.availableModels.forEach(model => {
-                        const option = document.createElement('option');
-                        option.value = model;
-                        option.textContent = model;
-                        dropdown.appendChild(option);
-                    });
-                    dropdown.value = this.selectedModel;
-                }
-            }
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            console.error('Failed to load models:', error);
-            new Notice(`Failed to load models: ${errorMessage}`);
+    
+    async onSubmit() {
+        const query = this.queryInput.value.trim();
+        if (!query) {
+            new Notice(this.promptsService.getEnterQuestionNotice());
+            return;
         }
-    }
 
+        const processedQuery = query;
+
+        const options: LMStudioOptions = {
+            max_tokens: parseInt(this.maxTokensInput.value) || 2048,
+            temperature: parseFloat(this.temperatureInput.value) || 0.7,
+            model: this.modelSelect.value,
+            stream: this.streamToggle.checked,
+            editor: this.editor,
+        };
+        
+        const systemPrompt = this.systemPromptInput.value.trim();
+        if (systemPrompt) {
+            options.system_prompt = systemPrompt;
+        }
+
+        this.close();
+        await this.lmStudioService.queryLMStudio(processedQuery, {
+            ...options,
+            model: this.modelSelect.value,
+            editor: this.editor
+        });
+    }
+    
     onClose() {
-        const { contentEl } = this;
+        const {contentEl} = this;
         contentEl.empty();
     }
-}
+} 
