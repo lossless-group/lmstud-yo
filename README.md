@@ -1,5 +1,5 @@
-![LMStud Yo: An Obsidian Community Plugin by The Lossless Group](https://i.imgur.com/weM9B08.png)
-![](https://i.imgur.com/weM9B08.png)
+![LMStud Yo: An Obsidian Community Plugin by The Lossless Group](https://i.imgur.com/qZbLKzJ.png)
+
 
 # 'LMStud Yo' Obsidian Community Plugin
 
