@@ -13,6 +13,10 @@ An Obsidian plugin that allows you to generate content using locally stored mode
 - System prompt support for customizing model behavior
 - Seamless integration with Obsidian's editor
 
+### Demo
+![LMStud-yo Obsidian Community Plugin, quick GIF Demo on July 27, 2025](https://i.imgur.com/blhuOx8.gif)
+
+
 ## Usage
 
 1. **Accessing the Chat Interface**:
