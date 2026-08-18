@@ -7,6 +7,9 @@ applies_to: any plugin in the lossless-group/content-farm ecosystem
 authors:
   - Michael Staton
 augmented_with: Claude Code on Claude Opus 4.7 (1M context)
+site_uuid: 679f8a93-d6ca-4ab9-a4fe-a060b9ec5718
+hex_code: vff4dn
+date_created: 2026-05-04
 ---
 
 ## The one rule
